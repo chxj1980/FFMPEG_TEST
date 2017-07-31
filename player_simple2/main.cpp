@@ -18,18 +18,13 @@ int sfp_refresh_thread(void *opaque)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-
-	AVFormatContext	*pFormatCtx;
-	int				i, videoindex;
-	AVCodecContext	*pCodecCtx;
-	AVCodec			*pCodec;
-	char filepath[] = "../testfile/mp4_test.mp4";
-
 	av_register_all();
 	avformat_network_init();
-	pFormatCtx = avformat_alloc_context();
 
-	if (avformat_open_input(&pFormatCtx, filepath, NULL, NULL) != 0){
+	AVFormatContext* pFormatCtx = avformat_alloc_context();
+	char filepath[] = "../testfile/mp4_test.mp4";
+	if (avformat_open_input(&pFormatCtx, filepath, NULL, NULL) != 0)
+	{
 		printf("Couldn't open input stream.（无法打开输入流）\n");
 		return -1;
 	}
@@ -38,20 +33,23 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("Couldn't find stream information.（无法获取流信息）\n");
 		return -1;
 	}
-	videoindex = -1;
-	for (i = 0; i<pFormatCtx->nb_streams; i++)
-	if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO)
+	int videoindex = -1;
+	for (int i = 0; i < pFormatCtx->nb_streams; i++)
 	{
-		videoindex = i;
-		break;
+		if (pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO)
+		{
+			videoindex = i;
+			break;
+		}
 	}
 	if (videoindex == -1)
 	{
 		printf("Didn't find a video stream.（没有找到视频流）\n");
 		return -1;
 	}
-	pCodecCtx = pFormatCtx->streams[videoindex]->codec;
-	pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
+
+	AVCodecContext* pCodecCtx = pFormatCtx->streams[videoindex]->codec;
+	AVCodec* pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
 	if (pCodec == NULL)
 	{
 		printf("Codec not found.（没有找到解码器）\n");
@@ -62,9 +60,9 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("Could not open codec.（无法打开解码器）\n");
 		return -1;
 	}
-	AVFrame	*pFrame, *pFrameYUV;
-	pFrame = avcodec_alloc_frame();
-	pFrameYUV = avcodec_alloc_frame();
+
+	AVFrame* pFrame = avcodec_alloc_frame();
+	AVFrame* pFrameYUV = avcodec_alloc_frame();
 	uint8_t *out_buffer = (uint8_t *)av_malloc(avpicture_get_size(PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height));
 	avpicture_fill((AVPicture *)pFrameYUV, out_buffer, PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height);
 	//------------SDL----------------
@@ -82,11 +80,11 @@ int _tmain(int argc, _TCHAR* argv[])
 		screen_w, screen_h,
 		SDL_WINDOW_OPENGL);
 
-	if (!screen) {
+	if (!screen)
+	{
 		printf("SDL: could not create window - exiting:%s\n", SDL_GetError());
 		return -1;
 	}
-
 
 	SDL_Renderer* sdlRenderer = SDL_CreateRenderer(screen, -1, 0);
 	//IYUV: Y + U + V  (3 planes)
@@ -100,7 +98,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	sdlRect.h = screen_h;
 
 	int ret, got_picture;
-
 	AVPacket *packet = (AVPacket *)av_malloc(sizeof(AVPacket));
 	//Output Info-----------------------------
 	printf("File Information（文件信息）---------------------\n");
@@ -114,19 +111,25 @@ int _tmain(int argc, _TCHAR* argv[])
 	//
 	//Event Loop
 	SDL_Event event;
-	for (;;) {
+	while (1)
+	{
 		//Wait
 		SDL_WaitEvent(&event);
-		if (event.type == SFM_REFRESH_EVENT){
+		if (event.type == SFM_REFRESH_EVENT)
+		{
 			//------------------------------
-			if (av_read_frame(pFormatCtx, packet) >= 0){
-				if (packet->stream_index == videoindex){
+			if (av_read_frame(pFormatCtx, packet) >= 0)
+			{
+				if (packet->stream_index == videoindex)
+				{
 					ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
-					if (ret < 0){
+					if (ret < 0)
+					{
 						printf("Decode Error.（解码错误）\n");
 						return -1;
 					}
-					if (got_picture){
+					if (got_picture)
+					{
 						sws_scale(img_convert_ctx, (const uint8_t* const*)pFrame->data, pFrame->linesize, 0, pCodecCtx->height, pFrameYUV->data, pFrameYUV->linesize);
 						//SDL---------------------------
 						SDL_UpdateTexture(sdlTexture, &sdlRect, pFrameYUV->data[0], pFrameYUV->linesize[0]);
@@ -138,13 +141,13 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				av_free_packet(packet);
 			}
-			else{
+			else
+			{
 				//Exit Thread
 				thread_exit = 1;
 				break;
 			}
 		}
-
 	}
 
 	sws_freeContext(img_convert_ctx);
